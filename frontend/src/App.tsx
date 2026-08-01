@@ -1,4 +1,6 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import Landing from "./pages/Landing";
 import Registration from "./pages/Registration";
 import BirthdayDetails from "./pages/BirthdayDetails";
@@ -15,6 +17,14 @@ function App() {
         <Route path="/song-selection" element={<SongSelectionPage />} />
         <Route path="/song" element={<SongPage />} />
       </Routes>
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        newestOnTop
+        closeOnClick
+        pauseOnHover
+        theme="colored"
+      />
     </Router>
   );
 }

@@ -1,105 +1,84 @@
-import React, { FC, useState, useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
-import { ToastContainer, toast } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
-
-import bgImage from "../assets/BG.jpg";
-import progressImage from "../assets/progress bar1.png";
+import React, { FC, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
+import Layout from "../components/Layout";
 import giftImage from "../assets/Asset 1.png";
 import partyHatImage from "../assets/Cap&Gift.png";
 import balloonImage from "../assets/Balloon.png";
-import noteImage from "../assets/Purple tone.png";
-import Navbar from "../components/Navbar";
+import { isLoggedIn, saveDetails, getDetails } from "../utils/session";
 
-interface LocationState {
-  userId?: string;
-}
+const fieldClass =
+  "w-full px-4 py-3 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-yellow-400";
 
 const BirthdayDetails: FC = () => {
   const navigate = useNavigate();
-  const location = useLocation();
-  const { userId } = (location.state || {}) as LocationState;
+  const saved = getDetails();
 
-  const [recipientName, setRecipientName] = useState("");
-  const [recipientAge, setRecipientAge] = useState<number>(1);
-  const [recipientGender, setRecipientGender] = useState("Male");
+  const [recipientName, setRecipientName] = useState(saved?.recipientName ?? "");
+  const [recipientAge, setRecipientAge] = useState<number>(
+    saved?.recipientAge ?? 1
+  );
+  const [recipientGender, setRecipientGender] = useState(
+    saved?.recipientGender ?? "Male"
+  );
 
   useEffect(() => {
-    if (!userId) {
-      toast.error("User not found. Please register first.");
-      navigate("/");
+    if (!isLoggedIn()) {
+      toast.error("Please register first.");
+      navigate("/register");
     }
-  }, [userId, navigate]);
+  }, [navigate]);
 
   const handleProceed = () => {
-    if (!recipientName.trim()) {
+    const name = recipientName.trim();
+    if (!name) {
       toast.error("Please enter the recipient's name");
       return;
     }
+    if (!/^[\p{L}][\p{L} .'-]{0,39}$/u.test(name)) {
+      toast.error("Name can only contain letters and spaces (max 40)");
+      return;
+    }
 
-    navigate("/song-selection", {
-      state: {
-        userId,
-        recipientName,
-        recipientAge,
-        recipientGender,
-      },
-    });
+    saveDetails({ recipientName: name, recipientAge, recipientGender });
+    navigate("/song-selection");
   };
 
   return (
-    <div
-      className="min-h-screen flex flex-col items-center justify-start bg-cover bg-center"
-      style={{ backgroundImage: `url(${bgImage})` }}
-    >
-      {/* ToastContainer */}
-      <ToastContainer
-        position="top-right"
-        autoClose={3000}
-        hideProgressBar={false}
-        newestOnTop={false}
-        closeOnClick
-        rtl={false}
-        pauseOnFocusLoss
-        draggable
-        pauseOnHover
-        theme="colored"
-      />
-
-      <Navbar onMenuClick={() => console.log("Menu clicked!")} />
-
-      <div className="mt-4">
-        <img src={progressImage} alt="progress" className="h-4" />
-      </div>
-
-      <h2 className="text-white text-xl font-semibold mt-6 text-center">
+    <Layout step={2}>
+      <h2 className="text-white text-xl sm:text-2xl font-semibold mt-6 text-center">
         Tell us about your loved one...
       </h2>
 
-      <div className="flex justify-center gap-6 mt-6">
-        <img src={giftImage} alt="gift" className="h-24 w-auto" />
-        <img src={partyHatImage} alt="partyhat" className="h-24 w-auto" />
-        <img src={balloonImage} alt="balloon" className="h-24 w-auto" />
+      <div className="flex justify-center items-end gap-4 sm:gap-6 mt-6">
+        <img src={giftImage} alt="" className="h-16 sm:h-24 w-auto" />
+        <img src={partyHatImage} alt="" className="h-16 sm:h-24 w-auto" />
+        <img src={balloonImage} alt="" className="h-16 sm:h-24 w-auto" />
       </div>
 
-      <div className="w-full mt-8 flex flex-col gap-6 items-center">
-        <div className="w-8/12 max-w-sm text-center">
-          <label className="text-white block mb-2">Their name</label>
+      <div className="w-full max-w-sm mt-8 flex flex-col gap-6">
+        <div>
+          <label htmlFor="recipientName" className="text-white block mb-2">
+            Their name
+          </label>
           <input
+            id="recipientName"
             type="text"
             placeholder="Enter Their Name"
-            className="w-full px-4 py-3 rounded-lg focus:outline-none text-gray-900"
+            maxLength={40}
+            className={fieldClass}
             value={recipientName}
             onChange={(e) => setRecipientName(e.target.value)}
           />
         </div>
 
-        <div className="w-8/12 max-w-sm text-center">
-          <label className="text-white block mb-2">
-            How old they'll be this birthday
+        <div>
+          <label htmlFor="recipientAge" className="text-white block mb-2">
+            How old they&apos;ll be this birthday
           </label>
           <select
-            className="w-full px-4 py-3 rounded-lg text-gray-900"
+            id="recipientAge"
+            className={fieldClass}
             value={recipientAge}
             onChange={(e) => setRecipientAge(Number(e.target.value))}
           >
@@ -111,10 +90,13 @@ const BirthdayDetails: FC = () => {
           </select>
         </div>
 
-        <div className="w-8/12 max-w-sm text-center">
-          <label className="text-white block mb-2">Gender</label>
+        <div>
+          <label htmlFor="recipientGender" className="text-white block mb-2">
+            Gender
+          </label>
           <select
-            className="w-full px-4 py-3 rounded-lg text-gray-900"
+            id="recipientGender"
+            className={fieldClass}
             value={recipientGender}
             onChange={(e) => setRecipientGender(e.target.value)}
           >
@@ -125,21 +107,15 @@ const BirthdayDetails: FC = () => {
         </div>
       </div>
 
-      <div className="relative w-full flex justify-center mt-12 mb-8">
-        <img
-          src={noteImage}
-          alt="note"
-          className="absolute left-10 bottom-0 h-10 w-auto"
-        />
-
+      <div className="w-full flex justify-center mt-10">
         <button
-          className="bg-yellow-400 px-12 py-3 rounded-lg font-semibold text-purple-900"
+          className="bg-yellow-400 hover:bg-yellow-500 active:scale-[0.98] px-12 py-3 rounded-lg font-bold text-purple-900 shadow-md transition"
           onClick={handleProceed}
         >
           Proceed
         </button>
       </div>
-    </div>
+    </Layout>
   );
 };
 

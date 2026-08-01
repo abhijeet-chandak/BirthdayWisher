@@ -1,42 +1,71 @@
-import { Request, Response } from "express";
+import { Response } from "express";
 import UserModel from "../models/user.model";
+import { AuthedRequest } from "../middleware/auth";
 import { generateBirthdaySong } from "../utils/gemini";
+import {
+  cleanText,
+  NAME_REGEX,
+  MOODS,
+  GENRES,
+  GENDERS,
+  VOICES,
+} from "../utils/validate";
 
 /**
  * Generate a Personalized Birthday Song
- * - Requires verified user
- * - Uses Gemini API utility to generate lyrics
- * - Saves song under user document
+ * - User comes from the verified session token, never the request body
+ * - All creative inputs are validated against allowlists before they
+ *   reach the LLM prompt
  */
-export const generateSong = async (req: Request, res: Response) => {
+export const generateSong = async (req: AuthedRequest, res: Response) => {
   try {
-    const {
-      userId,
-      recipientName,
-      recipientAge,
-      recipientGender,
-      mood,
-      genre,
-      singerVoice,
-    }: {
-      userId: string;
-      recipientName: string;
-      recipientAge: number;
-      recipientGender: string;
-      mood?: string;
-      genre?: string;
-      singerVoice?: string;
-    } = req.body;
+    const recipientName = cleanText(req.body?.recipientName);
+    const recipientAge = Number(req.body?.recipientAge);
+    const recipientGender = cleanText(req.body?.recipientGender).toLowerCase();
+    const mood = cleanText(req.body?.mood).toLowerCase() || "happy";
+    const genre = cleanText(req.body?.genre).toLowerCase() || "pop";
+    const singerVoice =
+      cleanText(req.body?.singerVoice).toLowerCase() || "female";
 
-    if (!userId || !recipientName || !recipientAge || !recipientGender) {
-      return res.status(400).json({
+    if (!recipientName || !NAME_REGEX.test(recipientName)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Enter a valid recipient name" });
+    }
+    if (
+      !Number.isInteger(recipientAge) ||
+      recipientAge < 1 ||
+      recipientAge > 120
+    ) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Enter a valid age (1-120)" });
+    }
+    if (!GENDERS.includes(recipientGender)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid gender" });
+    }
+    if (!MOODS.includes(mood)) {
+      return res.status(400).json({ success: false, message: "Invalid mood" });
+    }
+    if (!GENRES.includes(genre)) {
+      return res.status(400).json({ success: false, message: "Invalid genre" });
+    }
+    if (!VOICES.includes(singerVoice)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid singer voice" });
+    }
+
+    if (!process.env.GEMINI_API_KEY) {
+      return res.status(503).json({
         success: false,
-        message:
-          "userId, recipientName, recipientAge, and recipientGender are required",
+        message: "Song generation is not configured",
       });
     }
 
-    const user = await UserModel.findById(userId);
+    const user = await UserModel.findById(req.userId);
     if (!user) {
       return res
         .status(404)
@@ -52,13 +81,13 @@ export const generateSong = async (req: Request, res: Response) => {
       recipientName,
       recipientAge,
       recipientGender,
-      mood || "happy",
-      genre || "pop",
-      singerVoice || "default"
+      mood,
+      genre,
+      singerVoice
     );
 
     if (!lyrics) {
-      return res.status(500).json({
+      return res.status(502).json({
         success: false,
         message: "Failed to generate song lyrics",
       });
@@ -68,9 +97,9 @@ export const generateSong = async (req: Request, res: Response) => {
       recipientName,
       recipientAge,
       recipientGender,
-      mood: mood || "happy",
-      genre: genre || "pop",
-      singerVoice: singerVoice || "default",
+      mood,
+      genre,
+      singerVoice,
       lyrics,
       createdAt: new Date(),
     };

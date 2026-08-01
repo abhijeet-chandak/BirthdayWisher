@@ -1,28 +1,50 @@
-import React, { FC, useState, useEffect } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { ToastContainer, toast } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+import React, { FC, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
+import Layout from "../components/Layout";
+import CategorySelector, {
+  CategoryOption,
+} from "../components/CategorySelector";
+import { apiPost } from "../utils/api";
+import { isLoggedIn, getDetails, saveSong, Song } from "../utils/session";
 
-import bgImage from "../assets/BG.jpg";
-import progressImage from "../assets/progress bar2.png";
-import giftImage from "../assets/Purple Music Tone.png";
-import partyHatImage from "../assets/Headphone.png";
-import balloonImage from "../assets/Balloon2.png";
-import Navbar from "../components/Navbar";
-import CategorySelector from "../components/CategorySelector";
+import happyIcon from "../assets/Icons/Happy.png";
+import romanticIcon from "../assets/Icons/Romantic.png";
+import funnyIcon from "../assets/Icons/Funny.png";
+import motivationalIcon from "../assets/Icons/Motivational.png";
+import calmIcon from "../assets/Icons/Calm.png";
+import rapIcon from "../assets/Icons/Rap.png";
+import rockIcon from "../assets/Icons/Rock.png";
+import popIcon from "../assets/Icons/Pop.png";
+import desiIcon from "../assets/Icons/Desi.png";
+import edmIcon from "../assets/Icons/EDM.png";
+import maleIcon from "../assets/Icons/Male.png";
+import femaleIcon from "../assets/Icons/Female.png";
 
-interface LocationState {
-  userId?: string;
-  recipientName?: string;
-  recipientAge?: number;
-  recipientGender?: string;
-}
+const MOODS: CategoryOption[] = [
+  { label: "Happy", icon: happyIcon },
+  { label: "Romantic", icon: romanticIcon },
+  { label: "Funny", icon: funnyIcon },
+  { label: "Motivational", icon: motivationalIcon },
+  { label: "Calm", icon: calmIcon },
+];
+
+const GENRES: CategoryOption[] = [
+  { label: "Rap", icon: rapIcon },
+  { label: "Rock", icon: rockIcon },
+  { label: "Pop", icon: popIcon },
+  { label: "Desi", icon: desiIcon },
+  { label: "EDM", icon: edmIcon },
+];
+
+const SINGERS: CategoryOption[] = [
+  { label: "Male Voice", icon: maleIcon },
+  { label: "Female Voice", icon: femaleIcon },
+];
 
 const SongSelectionPage: FC = () => {
   const navigate = useNavigate();
-  const location = useLocation();
-  const { userId, recipientName, recipientAge, recipientGender } =
-    (location.state || {}) as LocationState;
+  const details = getDetails();
 
   const [selectedMood, setSelectedMood] = useState("");
   const [selectedGenre, setSelectedGenre] = useState("");
@@ -30,141 +52,100 @@ const SongSelectionPage: FC = () => {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!userId || !recipientName || !recipientAge || !recipientGender) {
-      toast.error("Missing user info. Please fill the birthday form first.");
+    if (!isLoggedIn()) {
+      toast.error("Please register first.");
+      navigate("/register");
+      return;
+    }
+    if (!details) {
+      toast.error("Please fill the birthday form first.");
       navigate("/birthday-details");
     }
-  }, [userId, recipientName, recipientAge, recipientGender, navigate]);
-
-  const moods = [
-    { label: "Happy", icon: "😊" },
-    { label: "Romantic", icon: "😘" },
-    { label: "Funny", icon: "🤠" },
-    { label: "Motivational", icon: "🌟" },
-    { label: "Calm", icon: "😌" },
-  ];
-
-  const genres = [
-    { label: "Rap", icon: "📻" },
-    { label: "Rock", icon: "🎸" },
-    { label: "Pop", icon: "🎤" },
-    { label: "Desi", icon: "🎻" },
-    { label: "EDM", icon: "🥁" },
-  ];
-
-  const singers = [
-    { label: "Male Voice", icon: "🧑‍🎤" },
-    { label: "Female Voice", icon: "👩‍🎤" },
-  ];
+  }, [details, navigate]);
 
   const handleProceed = async () => {
+    if (!details) return;
     if (!selectedMood || !selectedGenre || !selectedSinger) {
       toast.error("Please select Mood, Genre, and Singer's Voice");
       return;
     }
 
-    const payload = {
-      userId,
-      recipientName,
-      recipientAge,
-      recipientGender,
-      mood: selectedMood.toLowerCase(),
-      genre: selectedGenre.toLowerCase(),
-      singerVoice: selectedSinger.replace(" Voice", ""),
-    };
-
+    setLoading(true);
     try {
-      setLoading(true);
-      const res = await fetch("http://localhost:5000/api/songs/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      const { ok, status, body } = await apiPost(
+        "/api/songs/generate",
+        {
+          recipientName: details.recipientName,
+          recipientAge: details.recipientAge,
+          recipientGender: details.recipientGender.toLowerCase(),
+          mood: selectedMood.toLowerCase(),
+          genre: selectedGenre.toLowerCase(),
+          singerVoice: selectedSinger.replace(" Voice", "").toLowerCase(),
+        },
+        true
+      );
 
-      const data = await res.json();
-      setLoading(false);
-
-      if (res.ok && data.success) {
+      if (ok && body.success && body.song) {
+        saveSong(body.song as Song);
         toast.success("Song generated successfully!");
-        navigate("/song", { state: { song: data.song } });
+        navigate("/song");
+      } else if (status === 401) {
+        toast.error("Session expired. Please register again.");
+        navigate("/register");
       } else {
-        toast.error(data.error || "Failed to generate song.");
+        toast.error(body.message || "Failed to generate song.");
       }
-    } catch (err) {
-      setLoading(false);
+    } catch {
       toast.error("Network error. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div
-      className="min-h-screen flex flex-col items-center justify-start bg-cover bg-center"
-      style={{ backgroundImage: `url(${bgImage})` }}
-    >
-      <ToastContainer
-        position="top-right"
-        autoClose={3000}
-        hideProgressBar={false}
-        newestOnTop={false}
-        closeOnClick
-        rtl={false}
-        pauseOnFocusLoss
-        draggable
-        pauseOnHover
-        theme="colored"
-      />
-
-      <Navbar onMenuClick={() => console.log("Menu clicked!")} />
-
-      <div className="mt-4 flex justify-center">
-        <img src={progressImage} alt="progress" className="h-4" />
-      </div>
-
-      <h2 className="text-white text-xl font-semibold mt-6 text-center">
+    <Layout step={3}>
+      <h2 className="text-white text-xl sm:text-2xl font-semibold mt-6 text-center max-w-md">
         What would you like their song&apos;s vibe to be?
       </h2>
 
-      <div className="flex justify-center items-end gap-4 mt-6">
-        <img src={giftImage} alt="gift" className="h-12 w-12 self-end" />
-        <img src={partyHatImage} alt="partyhat" className="h-28 w-auto" />
-        <img
-          src={balloonImage}
-          alt="balloon"
-          className="h-16 w-auto self-center"
-        />
-      </div>
-
-      <div className="min-h-screen flex flex-col gap-8 p-6">
+      <div className="w-full flex flex-col gap-6 mt-8 max-w-xl">
         <CategorySelector
           title="Mood"
-          options={moods}
+          options={MOODS}
           selected={selectedMood}
-          onSelect={(val) => setSelectedMood(val)}
+          onSelect={setSelectedMood}
         />
         <CategorySelector
           title="Genre"
-          options={genres}
+          options={GENRES}
           selected={selectedGenre}
-          onSelect={(val) => setSelectedGenre(val)}
+          onSelect={setSelectedGenre}
         />
         <CategorySelector
           title="Singer's Voice"
-          options={singers}
+          options={SINGERS}
           selected={selectedSinger}
-          onSelect={(val) => setSelectedSinger(val)}
+          onSelect={setSelectedSinger}
         />
 
-        <div className="w-full flex justify-center mb-8">
+        <div className="w-full flex justify-center mt-2">
           <button
             onClick={handleProceed}
             disabled={loading}
-            className="bg-yellow-400 px-12 py-3 rounded-lg font-semibold text-purple-900 shadow-md disabled:opacity-50"
+            className="bg-yellow-400 hover:bg-yellow-500 active:scale-[0.98] px-12 py-3 rounded-lg font-bold text-purple-900 shadow-md transition disabled:opacity-60"
           >
-            {loading ? "Generating..." : "Proceed"}
+            {loading ? (
+              <span className="inline-flex items-center gap-2">
+                <span className="w-4 h-4 border-2 border-purple-900 border-t-transparent rounded-full animate-spin" />
+                Generating...
+              </span>
+            ) : (
+              "Proceed"
+            )}
           </button>
         </div>
       </div>
-    </div>
+    </Layout>
   );
 };
 

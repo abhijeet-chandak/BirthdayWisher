@@ -1,9 +1,16 @@
-# Node.js / Backend
+# Dependencies
 node_modules/
 package-lock.json
+
+# Environment — never commit real secrets (keep the .env.example files)
 .env
+.env.local
 
-# React / Frontend
-frontend/node_modules/
-frontend/package-lock.json
+# Build output
+backend/dist/
+frontend/build/
 
+# Logs & misc
+*.log
+.DS_Store
+coverage/
